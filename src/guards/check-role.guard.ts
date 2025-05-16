@@ -22,6 +22,7 @@ export class CheckRolesGuard implements CanActivate {
 
     const ctx = context.switchToHttp();
     const request = ctx.getRequest();
+    console.log(request.role)
 
     if (!roles.includes(request.role)) {
       throw new NotAcceptableException("Sizda ruhsat yo'q");

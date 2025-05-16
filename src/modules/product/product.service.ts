@@ -1,23 +1,70 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable, NotFoundException, OnModuleInit } from "@nestjs/common";
 import { InjectModel } from "@nestjs/sequelize";
 import { Product } from "./model";
 import { CreateProductDto, UpdateProductDto } from "./dtos";
 import { FsHelper } from "src/helper";
-import { where } from "sequelize";
+import * as fs from "node:fs"
+import * as path from "node:path";
+import { Op } from "sequelize";
+import { GetAllProductsDto } from "./dtos/get-all-product.dto";
+
+
+
 @Injectable()
-export class ProductService {
+export class ProductService implements OnModuleInit {
 
     constructor(@InjectModel(Product) private productModel: typeof Product, private fsHelper: FsHelper) { }
 
-    async getAll() {
-        const products = await this.productModel.findAll()
+    async onModuleInit() {
+        this.seedProduct()
+    }
 
+
+    async getAll(query: GetAllProductsDto) {
+        const filters: any = {};
+
+        if (query.minPrice !== undefined) {
+            filters.price = { [Op.gte]: query.minPrice };
+        }
+        if (query.maxPrice !== undefined) {
+            filters.price = { ...filters.price, [Op.lte]: query.maxPrice };
+        }
+
+        if (query.minDiscount) {
+            filters.discount = { [Op.gte]: query.minDiscount };
+        }
+        if (query.maxDiscount) {
+            filters.discount = { ...filters.discount, [Op.lte]: query.maxDiscount };
+        }
+        if (query.minRating) {
+            filters.rating = { [Op.gte]: query.minRating };
+        }
+        if (query.maxRating) {
+            filters.rating = { ...filters.rating, [Op.lte]: query.maxRating };
+        }
+
+        const page = query.page ?? 1;
+        const limit = query.limit ?? 10;
+
+        const { count, rows: products } = await this.productModel.findAndCountAll({
+            limit,
+            offset: (page - 1) * limit,
+            order: query.sortField
+                ? [[query.sortField, query.sortOrder ?? 'ASC']]
+                : undefined,
+            where: filters,
+            attributes: query.fields
+        });
         return {
-            message: "Barcha productlar",
-            count: products.length,
+            count,
+            page,
+            limit,
             data: products
         }
-    }
+    };
+
+
+
 
     async cerate(payload: CreateProductDto) {
         const image = await this.fsHelper.uploadFile(payload.image_url)
@@ -107,7 +154,40 @@ export class ProductService {
         await this.productModel.destroy({ where: { id } })
 
         return {
-            message:"Product o'chirildi"
+            message: "Product o'chirildi"
         }
     }
+
+    async seedProduct() {
+        const filePath = path.join(process.cwd(), 'src', 'data', 'MOCK_DATA.json');
+        console.log(filePath)
+
+        try {
+            const fileContent = fs.readFileSync(filePath, 'utf-8');
+            const products = JSON.parse(fileContent);
+
+            for (const product of products) {
+                const exists = await this.productModel.findOne({ where: { name: product.name } });
+
+                if (!exists) {
+                    await this.productModel.create({
+                        name: product.name,
+                        description: product.description,
+                        price: product.price,
+                        rating: product.rating,
+                        status: product.status,
+                        stock: product.stock,
+                        discount: product.discount,
+                        image_url: product.image_url || null
+                    });
+                }
+            }
+
+            console.log(`20 ta product qoshildi✅`);
+
+        } catch (error) {
+            console.error('seedProduct taratishda xatolik❌');
+        }
+    }
+
 }

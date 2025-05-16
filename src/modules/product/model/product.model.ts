@@ -8,13 +8,13 @@ export class Product extends Model {
     name: string
     @Column({ type: DataType.STRING })
     description: string
-    @Column({ type: DataType.INTEGER })
+    @Column({ type: DataType.FLOAT })
     price: number
-    @Column({ type: DataType.INTEGER })
+    @Column({ type: DataType.FLOAT })
     discount: number
-    @Column({ type: DataType.SMALLINT })
+    @Column({ type: DataType.FLOAT })
     rating: number
-    @Column({ type: DataType.INTEGER })
+    @Column({ type: DataType.FLOAT })
     stock: number
     @Column({
         type: DataType.ENUM,
